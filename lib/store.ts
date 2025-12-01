@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { Restaurant, BrandSettings } from '@/types'
 
 export interface CartItem {
   id: string
@@ -21,6 +22,10 @@ export interface UserInfo {
 }
 
 interface AppState {
+  // Restaurant
+  restaurant: Restaurant | null
+  setRestaurant: (restaurant: Restaurant | null) => void
+
   // Table
   tableId: string | null
   tableNumber: number | null
@@ -49,6 +54,10 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
+      // Restaurant
+      restaurant: null,
+      setRestaurant: (restaurant) => set({ restaurant }),
+
       // Table
       tableId: null,
       tableNumber: null,
@@ -112,3 +121,28 @@ export const useAppStore = create<AppState>()(
   )
 )
 
+// Staff store for dashboard
+interface StaffState {
+  restaurantId: string | null
+  staffId: string | null
+  staffName: string | null
+  role: 'OWNER' | 'MANAGER' | 'CHEF' | 'WAITER' | null
+  setStaff: (data: { restaurantId: string; staffId: string; staffName: string; role: StaffState['role'] }) => void
+  clearStaff: () => void
+}
+
+export const useStaffStore = create<StaffState>()(
+  persist(
+    (set) => ({
+      restaurantId: null,
+      staffId: null,
+      staffName: null,
+      role: null,
+      setStaff: (data) => set(data),
+      clearStaff: () => set({ restaurantId: null, staffId: null, staffName: null, role: null }),
+    }),
+    {
+      name: 'dine-dash-staff-store',
+    }
+  )
+)

@@ -6,90 +6,223 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id          String   @id @default(cuid())
-  name        String?
-  email       String?  @unique
-  phone       String   @unique
-  password    String?
-  role        UserRole @default(CUSTOMER)
-  verified    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  orders      Order[]
+// ==================== RESTAURANT & PLATFORM ====================
+
+model Restaurant {
+  id              String            @id @default(cuid())
+  name            String
+  slug            String            @unique
+  description     String?
+  email           String            @unique
+  phone           String
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String            @default("India")
+  isActive        Boolean           @default(false)
+  isVerified      Boolean           @default(false)
+  subscriptionPlan SubscriptionPlan @default(FREE)
+  subscriptionEnd DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relations
+  brandSettings   BrandSettings?
+  staff           Staff[]
+  tables          Table[]
+  categories      Category[]
+  menuItems       MenuItem[]
+  orders          Order[]
+  customers       Customer[]
 }
 
-enum UserRole {
-  CUSTOMER
-  ADMIN
+model BrandSettings {
+  id              String     @id @default(cuid())
+  restaurantId    String     @unique
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  // Branding
+  logoUrl         String?
+  faviconUrl      String?
+  coverImageUrl   String?
+  
+  // Colors
+  primaryColor    String     @default("#e63946")
+  secondaryColor  String     @default("#457b9d")
+  accentColor     String     @default("#f4a261")
+  backgroundColor String     @default("#fdf8f5")
+  textColor       String     @default("#1d3557")
+  
+  // Typography
+  headingFont     String     @default("Playfair Display")
+  bodyFont        String     @default("Outfit")
+  
+  // Content
+  welcomeMessage  String?
+  tagline         String?
+  
+  // Gallery
+  galleryImages   String[]
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// ==================== STAFF & AUTH ====================
+
+model Staff {
+  id            String       @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name          String
+  email         String       @unique
+  phone         String?
+  password      String
+  role          StaffRole
+  isActive      Boolean      @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([restaurantId])
+}
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  CHEF
+  WAITER
+}
+
+// ==================== CUSTOMERS ====================
+
+model Customer {
+  id            String      @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name          String?
+  email         String?
+  phone         String
+  verified      Boolean     @default(false)
+  totalOrders   Int         @default(0)
+  totalSpent    Float       @default(0)
+  lastOrderAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  orders        Order[]
+
+  @@unique([restaurantId, phone])
+  @@index([restaurantId])
+}
+
+// ==================== TABLES ====================
 
 model Table {
-  id        String   @id @default(cuid())
-  number    Int      @unique
-  qrCode    String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  orders    Order[]
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  number       Int
+  name         String?    // e.g., "Window Seat", "Private Booth"
+  capacity     Int        @default(4)
+  qrCode       String?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  orders       Order[]
+
+  @@unique([restaurantId, number])
+  @@index([restaurantId])
 }
 
+// ==================== MENU ====================
+
 model Category {
-  id        String     @id @default(cuid())
-  name      String
-  image     String?
-  sortOrder Int        @default(0)
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  items     MenuItem[]
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  image        String?
+  sortOrder    Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  items        MenuItem[]
+
+  @@index([restaurantId])
 }
 
 model MenuItem {
-  id           String      @id @default(cuid())
-  name         String
-  description  String?
-  price        Float
-  image        String?
-  isVeg        Boolean     @default(false)
-  isAvailable  Boolean     @default(true)
-  categoryId   String
-  category     Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  sortOrder    Int         @default(0)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  orderItems   OrderItem[]
+  id             String          @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  price          Float
+  image          String?
+  isVeg          Boolean         @default(false)
+  isAvailable    Boolean         @default(true)
+  isFeatured     Boolean         @default(false)
+  preparationTime Int?           // in minutes
+  categoryId     String
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  orderItems     OrderItem[]
   customizations Customization[]
+
+  @@index([restaurantId])
+  @@index([categoryId])
 }
 
 model Customization {
   id         String   @id @default(cuid())
   name       String
-  options    String[] // JSON array of options
+  options    String[]
   required   Boolean  @default(false)
   menuItemId String
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 }
 
+// ==================== ORDERS ====================
+
 model Order {
-  id              String      @id @default(cuid())
-  orderNumber     String      @unique
-  status          OrderStatus @default(PENDING)
+  id              String        @id @default(cuid())
+  restaurantId    String
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderNumber     String
+  status          OrderStatus   @default(PENDING)
   tableId         String
-  table           Table       @relation(fields: [tableId], references: [id])
-  userId          String?
-  user            User?       @relation(fields: [userId], references: [id])
+  table           Table         @relation(fields: [tableId], references: [id])
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
   customerName    String?
   customerPhone   String?
   items           OrderItem[]
   subtotal        Float
-  tax             Float       @default(0)
+  tax             Float         @default(0)
   total           Float
+  tip             Float         @default(0)
   specialRequests String?
-  estimatedTime   Int?        // in minutes
+  estimatedTime   Int?
+  servedBy        String?       // Staff ID who served the order
   paymentStatus   PaymentStatus @default(PENDING)
   paymentMethod   String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([restaurantId, orderNumber])
+  @@index([restaurantId])
+  @@index([tableId])
+  @@index([status])
 }
 
 model OrderItem {
@@ -100,18 +233,9 @@ model OrderItem {
   menuItem       MenuItem @relation(fields: [menuItemId], references: [id])
   quantity       Int
   price          Float
-  customizations Json?    // Selected customization options
+  customizations Json?
   notes          String?
   createdAt      DateTime @default(now())
-}
-
-model OTP {
-  id        String   @id @default(cuid())
-  phone     String
-  code      String
-  expiresAt DateTime
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now())
 }
 
 enum OrderStatus {
@@ -129,4 +253,35 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+// ==================== OTP ====================
+
+model OTP {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ==================== PLATFORM ADMIN ====================
+
+model PlatformAdmin {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      PlatformRole @default(ADMIN)
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum PlatformRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
 }

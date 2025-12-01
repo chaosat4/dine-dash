@@ -1,11 +1,100 @@
+// ==================== RESTAURANT & PLATFORM ====================
+
+export interface Restaurant {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  email: string
+  phone: string
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  country: string
+  isActive: boolean
+  isVerified: boolean
+  subscriptionPlan: SubscriptionPlan
+  subscriptionEnd?: string
+  brandSettings?: BrandSettings
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BrandSettings {
+  id: string
+  restaurantId: string
+  logoUrl?: string
+  faviconUrl?: string
+  coverImageUrl?: string
+  primaryColor: string
+  secondaryColor: string
+  accentColor: string
+  backgroundColor: string
+  textColor: string
+  headingFont: string
+  bodyFont: string
+  welcomeMessage?: string
+  tagline?: string
+  galleryImages: string[]
+}
+
+export type SubscriptionPlan = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'
+
+// ==================== STAFF & AUTH ====================
+
+export interface Staff {
+  id: string
+  restaurantId: string
+  restaurant?: Restaurant
+  name: string
+  email: string
+  phone?: string
+  role: StaffRole
+  isActive: boolean
+  lastLogin?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type StaffRole = 'OWNER' | 'MANAGER' | 'CHEF' | 'WAITER'
+
+export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
+  OWNER: 'Owner',
+  MANAGER: 'Manager',
+  CHEF: 'Kitchen Staff',
+  WAITER: 'Waiter',
+}
+
+// ==================== CUSTOMER ====================
+
+export interface Customer {
+  id: string
+  restaurantId: string
+  name?: string
+  email?: string
+  phone: string
+  verified: boolean
+  totalOrders: number
+  totalSpent: number
+  lastOrderAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// ==================== MENU ====================
+
 export interface MenuItem {
   id: string
+  restaurantId: string
   name: string
   description?: string
   price: number
   image?: string
   isVeg: boolean
   isAvailable: boolean
+  isFeatured: boolean
+  preparationTime?: number
   categoryId: string
   category?: Category
   customizations?: Customization[]
@@ -13,7 +102,9 @@ export interface MenuItem {
 
 export interface Category {
   id: string
+  restaurantId: string
   name: string
+  description?: string
   image?: string
   sortOrder: number
   isActive: boolean
@@ -27,20 +118,39 @@ export interface Customization {
   required: boolean
 }
 
+// ==================== TABLE ====================
+
+export interface Table {
+  id: string
+  restaurantId: string
+  number: number
+  name?: string
+  capacity: number
+  qrCode?: string
+  isActive: boolean
+}
+
+// ==================== ORDER ====================
+
 export interface Order {
   id: string
+  restaurantId: string
   orderNumber: string
   status: OrderStatus
   tableId: string
   table?: Table
+  customerId?: string
+  customer?: Customer
   customerName?: string
   customerPhone?: string
   items: OrderItem[]
   subtotal: number
   tax: number
   total: number
+  tip: number
   specialRequests?: string
   estimatedTime?: number
+  servedBy?: string
   paymentStatus: PaymentStatus
   paymentMethod?: string
   createdAt: string
@@ -56,13 +166,6 @@ export interface OrderItem {
   price: number
   customizations?: Record<string, string>
   notes?: string
-}
-
-export interface Table {
-  id: string
-  number: number
-  qrCode?: string
-  isActive: boolean
 }
 
 export type OrderStatus =
@@ -96,3 +199,25 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   CANCELLED: 'bg-red-500',
 }
 
+// ==================== ANALYTICS ====================
+
+export interface DashboardStats {
+  totalOrders: number
+  todayOrders: number
+  totalRevenue: number
+  todayRevenue: number
+  averageOrderValue: number
+  pendingOrders: number
+  completedOrders: number
+  cancelledOrders: number
+  topItems: { name: string; count: number; revenue: number }[]
+  hourlyOrders: { hour: number; count: number }[]
+  recentOrders: Order[]
+}
+
+export interface KitchenStats {
+  pendingCount: number
+  preparingCount: number
+  readyCount: number
+  avgPrepTime: number
+}
