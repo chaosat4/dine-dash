@@ -197,8 +197,8 @@ export default function OrderTrackingPage() {
                         } ${isCurrent ? 'ring-4 ring-opacity-30' : ''}`}
                         style={{ 
                           backgroundColor: isActive ? brandSettings?.primaryColor || 'var(--primary)' : undefined,
-                          ringColor: isCurrent ? brandSettings?.primaryColor || 'var(--primary)' : undefined
-                        }}
+                          '--tw-ring-color': isCurrent ? brandSettings?.primaryColor || 'var(--primary)' : undefined
+                        } as React.CSSProperties}
                       >
                         <Icon className="w-5 h-5" />
                       </div>

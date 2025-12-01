@@ -61,8 +61,8 @@ export const ROLE_PERMISSIONS = {
 } as const
 
 export function canAccess(role: SessionData['role'], permission: string): boolean {
-  const permissions = ROLE_PERMISSIONS[role] || []
-  return permissions.includes(permission as typeof permissions[number])
+  const permissions: readonly string[] = ROLE_PERMISSIONS[role] || []
+  return permissions.includes(permission)
 }
 
 // Legacy support - will be deprecated

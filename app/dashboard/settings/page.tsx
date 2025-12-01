@@ -14,6 +14,10 @@ import {
   Mail,
   MapPin,
   ImageIcon,
+  Receipt,
+  Percent,
+  Trash2,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -33,7 +37,26 @@ const COLOR_PRESETS = [
 const TABS = [
   { id: 'general', label: 'General', icon: Building2 },
   { id: 'branding', label: 'Branding', icon: Palette },
+  { id: 'billing', label: 'Billing & Taxes', icon: Receipt },
 ]
+
+const CURRENCIES = [
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+]
+
+interface TaxItem {
+  id: string
+  name: string
+  rate: number
+  isActive: boolean
+}
 
 function LogoUploadSettings({ logoUrl, onUpload }: { logoUrl: string; onUpload: (url: string) => void }) {
   const [isUploading, setIsUploading] = useState(false)
@@ -138,6 +161,14 @@ export default function SettingsPage() {
     tagline: '',
   })
 
+  const [billingForm, setBillingForm] = useState({
+    currency: 'INR',
+    currencySymbol: '₹',
+    taxEnabled: true,
+    taxInclusive: false,
+    taxes: [] as TaxItem[],
+  })
+
   useEffect(() => {
     fetchSettings()
   }, [restaurantId])
@@ -175,6 +206,20 @@ export default function SettingsPage() {
             tagline: data.brandSettings.tagline || '',
           })
         }
+
+        // Set billing settings
+        setBillingForm({
+          currency: data.restaurant.currency || 'INR',
+          currencySymbol: data.restaurant.currencySymbol || '₹',
+          taxEnabled: data.restaurant.taxEnabled ?? true,
+          taxInclusive: data.restaurant.taxInclusive ?? false,
+          taxes: (data.taxSettings || []).map((t: { id: string; name: string; rate: number; isActive: boolean }) => ({
+            id: t.id,
+            name: t.name,
+            rate: t.rate,
+            isActive: t.isActive,
+          })),
+        })
       }
     } catch (error) {
       console.error('Error fetching settings:', error)
@@ -223,6 +268,55 @@ export default function SettingsPage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleSaveBilling = async () => {
+    setIsSaving(true)
+    try {
+      const res = await fetch('/api/dashboard/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'billing', data: billingForm }),
+      })
+
+      if (res.ok) {
+        addToast({ title: 'Billing settings saved successfully', type: 'success' })
+      } else {
+        addToast({ title: 'Failed to save billing settings', type: 'error' })
+      }
+    } catch (error) {
+      addToast({ title: 'Failed to save billing settings', type: 'error' })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCurrencyChange = (code: string) => {
+    const currency = CURRENCIES.find(c => c.code === code)
+    if (currency) {
+      setBillingForm({ ...billingForm, currency: currency.code, currencySymbol: currency.symbol })
+    }
+  }
+
+  const addTax = () => {
+    const newTax: TaxItem = {
+      id: Date.now().toString(),
+      name: '',
+      rate: 0,
+      isActive: true,
+    }
+    setBillingForm({ ...billingForm, taxes: [...billingForm.taxes, newTax] })
+  }
+
+  const removeTax = (id: string) => {
+    setBillingForm({ ...billingForm, taxes: billingForm.taxes.filter(t => t.id !== id) })
+  }
+
+  const updateTax = (id: string, updates: Partial<TaxItem>) => {
+    setBillingForm({
+      ...billingForm,
+      taxes: billingForm.taxes.map(t => t.id === id ? { ...t, ...updates } : t)
+    })
   }
 
   if (isLoading) {
@@ -502,6 +596,172 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <Save className="w-4 h-4" />
                     Save Branding
+                  </div>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'billing' && (
+          <div className="space-y-8">
+            {/* Currency Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Currency</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {CURRENCIES.map((currency) => (
+                  <button
+                    key={currency.code}
+                    type="button"
+                    onClick={() => handleCurrencyChange(currency.code)}
+                    className={`p-4 rounded-xl border-2 transition-all text-left ${
+                      billingForm.currency === currency.code
+                        ? 'border-[var(--primary)] bg-red-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl font-bold text-[var(--text)]">{currency.symbol}</span>
+                      <span className="text-sm font-medium text-gray-600">{currency.code}</span>
+                    </div>
+                    <span className="text-xs text-gray-500">{currency.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tax Configuration */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Tax Settings</label>
+                  <p className="text-xs text-gray-500">Configure taxes for invoices and billing</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={billingForm.taxEnabled}
+                      onChange={(e) => setBillingForm({ ...billingForm, taxEnabled: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+                    />
+                    <span className="text-sm text-gray-700">Enable Taxes</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={billingForm.taxInclusive}
+                      onChange={(e) => setBillingForm({ ...billingForm, taxInclusive: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+                    />
+                    <span className="text-sm text-gray-700">Tax Inclusive</span>
+                  </label>
+                </div>
+              </div>
+
+              {billingForm.taxEnabled && (
+                <>
+                  <div className="space-y-3">
+                    {billingForm.taxes.map((tax) => (
+                      <div
+                        key={tax.id}
+                        className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                          <Percent className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <div className="flex-1 grid grid-cols-2 gap-3">
+                          <input
+                            type="text"
+                            value={tax.name}
+                            onChange={(e) => updateTax(tax.id, { name: e.target.value })}
+                            placeholder="Tax Name (e.g., GST)"
+                            className="px-3 py-2 border rounded-lg text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={tax.rate}
+                              onChange={(e) => updateTax(tax.id, { rate: parseFloat(e.target.value) || 0 })}
+                              placeholder="Rate"
+                              className="w-24 px-3 py-2 border rounded-lg text-sm"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                            />
+                            <span className="text-gray-500">%</span>
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={tax.isActive}
+                            onChange={(e) => updateTax(tax.id, { isActive: e.target.checked })}
+                            className="w-4 h-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+                          />
+                          <span className="text-xs text-gray-500">Active</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeTax(tax.id)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addTax}
+                    className="mt-3 flex items-center gap-2 text-sm text-[var(--primary)] hover:underline"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Tax
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Preview */}
+            <div className="bg-gray-50 rounded-xl p-6">
+              <h3 className="font-semibold text-[var(--text)] mb-4">Invoice Preview</h3>
+              <div className="bg-white rounded-lg p-4 shadow-sm max-w-sm">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span>{billingForm.currencySymbol}1,000.00</span>
+                </div>
+                {billingForm.taxEnabled && billingForm.taxes.filter(t => t.isActive && t.name && t.rate > 0).map((tax) => (
+                  <div key={tax.id} className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">{tax.name} ({tax.rate}%)</span>
+                    <span>{billingForm.currencySymbol}{(1000 * tax.rate / 100).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                  <span>Total</span>
+                  <span className="text-[var(--primary)]">
+                    {billingForm.currencySymbol}
+                    {(1000 + (billingForm.taxEnabled ? billingForm.taxes.filter(t => t.isActive).reduce((sum, t) => sum + (1000 * t.rate / 100), 0) : 0)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              {billingForm.taxInclusive && (
+                <p className="text-xs text-gray-500 mt-3">* All prices include applicable taxes</p>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={handleSaveBilling} disabled={isSaving}>
+                {isSaving ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Saving...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Save className="w-4 h-4" />
+                    Save Billing Settings
                   </div>
                 )}
               </Button>

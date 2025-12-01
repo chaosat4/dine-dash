@@ -15,6 +15,10 @@ import {
   Plus,
   Minus,
   ImageIcon,
+  Receipt,
+  Percent,
+  Trash2,
+  DollarSign,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -22,9 +26,31 @@ import { useToast } from '@/components/ui/Toaster'
 
 const STEPS = [
   { id: 'brand', title: 'Brand Identity', icon: Palette, description: 'Customize your look' },
+  { id: 'currency', title: 'Currency & Taxes', icon: Receipt, description: 'Billing settings' },
   { id: 'tables', title: 'Table Setup', icon: TableIcon, description: 'Configure tables' },
   { id: 'payment', title: 'Payment Setup', icon: CreditCard, description: 'Payment methods' },
   { id: 'complete', title: 'Go Live', icon: Check, description: 'Launch checklist' },
+]
+
+const CURRENCIES = [
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+]
+
+const TAX_PRESETS = [
+  { name: 'GST', rate: 5, description: 'Goods and Services Tax (5%)' },
+  { name: 'GST', rate: 12, description: 'Goods and Services Tax (12%)' },
+  { name: 'GST', rate: 18, description: 'Goods and Services Tax (18%)' },
+  { name: 'CGST', rate: 2.5, description: 'Central GST' },
+  { name: 'SGST', rate: 2.5, description: 'State GST' },
+  { name: 'Service Tax', rate: 10, description: 'Service Charge' },
+  { name: 'VAT', rate: 5, description: 'Value Added Tax' },
 ]
 
 const COLOR_PRESETS = [
@@ -45,6 +71,13 @@ const FONT_OPTIONS = [
   { name: 'Lora', family: 'Lora', style: 'Warm Serif' },
 ]
 
+interface TaxItem {
+  id: string
+  name: string
+  rate: number
+  isActive: boolean
+}
+
 interface SetupData {
   primaryColor: string
   secondaryColor: string
@@ -54,6 +87,13 @@ interface SetupData {
   logoUrl: string
   welcomeMessage: string
   tagline: string
+  // Currency & Tax
+  currency: string
+  currencySymbol: string
+  taxEnabled: boolean
+  taxInclusive: boolean
+  taxes: TaxItem[]
+  // Tables
   tableCount: number
   tablePrefix: string
   paymentMethods: string[]
@@ -76,6 +116,13 @@ function SetupContent() {
     logoUrl: '',
     welcomeMessage: 'Welcome to our restaurant!',
     tagline: 'Scan, Order, Enjoy',
+    // Currency & Tax
+    currency: 'INR',
+    currencySymbol: '₹',
+    taxEnabled: true,
+    taxInclusive: false,
+    taxes: [{ id: '1', name: 'GST', rate: 5, isActive: true }],
+    // Tables
     tableCount: 10,
     tablePrefix: 'Table',
     paymentMethods: ['cash'],
@@ -214,12 +261,15 @@ function SetupContent() {
               <BrandStep data={setupData} updateData={updateSetupData} />
             )}
             {currentStep === 1 && (
-              <TablesStep data={setupData} updateData={updateSetupData} />
+              <CurrencyTaxStep data={setupData} updateData={updateSetupData} />
             )}
             {currentStep === 2 && (
-              <PaymentStep data={setupData} togglePayment={togglePaymentMethod} />
+              <TablesStep data={setupData} updateData={updateSetupData} />
             )}
             {currentStep === 3 && (
+              <PaymentStep data={setupData} togglePayment={togglePaymentMethod} />
+            )}
+            {currentStep === 4 && (
               <CompleteStep data={setupData} />
             )}
           </motion.div>
@@ -467,7 +517,221 @@ function BrandStep({ data, updateData }: { data: SetupData; updateData: (updates
   )
 }
 
-// Step 2: Tables Setup
+// Step 2: Currency & Taxes
+function CurrencyTaxStep({ data, updateData }: { data: SetupData; updateData: (updates: Partial<SetupData>) => void }) {
+  const addTax = () => {
+    const newTax: TaxItem = {
+      id: Date.now().toString(),
+      name: '',
+      rate: 0,
+      isActive: true,
+    }
+    updateData({ taxes: [...data.taxes, newTax] })
+  }
+
+  const removeTax = (id: string) => {
+    updateData({ taxes: data.taxes.filter(t => t.id !== id) })
+  }
+
+  const updateTax = (id: string, updates: Partial<TaxItem>) => {
+    updateData({
+      taxes: data.taxes.map(t => t.id === id ? { ...t, ...updates } : t)
+    })
+  }
+
+  const addPresetTax = (preset: { name: string; rate: number }) => {
+    const exists = data.taxes.some(t => t.name === preset.name && t.rate === preset.rate)
+    if (!exists) {
+      const newTax: TaxItem = {
+        id: Date.now().toString(),
+        name: preset.name,
+        rate: preset.rate,
+        isActive: true,
+      }
+      updateData({ taxes: [...data.taxes, newTax] })
+    }
+  }
+
+  const handleCurrencyChange = (code: string) => {
+    const currency = CURRENCIES.find(c => c.code === code)
+    if (currency) {
+      updateData({ currency: currency.code, currencySymbol: currency.symbol })
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-xl font-bold text-[var(--text)] mb-2" style={{ fontFamily: 'var(--font-playfair)' }}>
+          Currency & Tax Settings
+        </h2>
+        <p className="text-gray-500">Configure billing currency and applicable taxes for invoices</p>
+      </div>
+
+      {/* Currency Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">Select Currency</label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {CURRENCIES.map((currency) => (
+            <button
+              key={currency.code}
+              onClick={() => handleCurrencyChange(currency.code)}
+              className={`p-4 rounded-xl border-2 transition-all text-left ${
+                data.currency === currency.code
+                  ? 'border-[var(--primary)] bg-red-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-2xl font-bold text-[var(--text)]">{currency.symbol}</span>
+                <span className="text-sm font-medium text-gray-600">{currency.code}</span>
+              </div>
+              <span className="text-xs text-gray-500">{currency.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tax Configuration */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Tax Configuration</label>
+            <p className="text-xs text-gray-500">Add taxes that apply to your orders</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={data.taxEnabled}
+                onChange={(e) => updateData({ taxEnabled: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+              />
+              <span className="text-sm text-gray-700">Enable Taxes</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={data.taxInclusive}
+                onChange={(e) => updateData({ taxInclusive: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+              />
+              <span className="text-sm text-gray-700">Tax Inclusive Prices</span>
+            </label>
+          </div>
+        </div>
+
+        {data.taxEnabled && (
+          <>
+            {/* Tax Presets */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-500 mb-2">Quick Add</label>
+              <div className="flex flex-wrap gap-2">
+                {TAX_PRESETS.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => addPresetTax(preset)}
+                    className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                  >
+                    {preset.name} ({preset.rate}%)
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Added Taxes */}
+            <div className="space-y-3">
+              {data.taxes.map((tax) => (
+                <div
+                  key={tax.id}
+                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                    <Percent className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div className="flex-1 grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={tax.name}
+                      onChange={(e) => updateTax(tax.id, { name: e.target.value })}
+                      placeholder="Tax Name (e.g., GST)"
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={tax.rate}
+                        onChange={(e) => updateTax(tax.id, { rate: parseFloat(e.target.value) || 0 })}
+                        placeholder="Rate"
+                        className="w-24 px-3 py-2 border rounded-lg text-sm"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                      />
+                      <span className="text-gray-500">%</span>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tax.isActive}
+                      onChange={(e) => updateTax(tax.id, { isActive: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+                    />
+                    <span className="text-xs text-gray-500">Active</span>
+                  </label>
+                  <button
+                    onClick={() => removeTax(tax.id)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={addTax}
+              className="mt-3 flex items-center gap-2 text-sm text-[var(--primary)] hover:underline"
+            >
+              <Plus className="w-4 h-4" />
+              Add Custom Tax
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Preview */}
+      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6">
+        <h3 className="font-semibold text-[var(--text)] mb-4">Invoice Preview</h3>
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">Subtotal</span>
+            <span>{data.currencySymbol}1,000.00</span>
+          </div>
+          {data.taxEnabled && data.taxes.filter(t => t.isActive && t.name && t.rate > 0).map((tax) => (
+            <div key={tax.id} className="flex justify-between text-sm mb-2">
+              <span className="text-gray-600">{tax.name} ({tax.rate}%)</span>
+              <span>{data.currencySymbol}{(1000 * tax.rate / 100).toFixed(2)}</span>
+            </div>
+          ))}
+          <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+            <span>Total</span>
+            <span className="text-[var(--primary)]">
+              {data.currencySymbol}
+              {(1000 + (data.taxEnabled ? data.taxes.filter(t => t.isActive).reduce((sum, t) => sum + (1000 * t.rate / 100), 0) : 0)).toFixed(2)}
+            </span>
+          </div>
+        </div>
+        {data.taxInclusive && (
+          <p className="text-xs text-gray-500 mt-2 text-center">* All prices include applicable taxes</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Step 3: Tables Setup
 function TablesStep({ data, updateData }: { data: SetupData; updateData: (updates: Partial<SetupData>) => void }) {
   return (
     <div className="space-y-8">
@@ -611,10 +875,14 @@ function PaymentStep({ data, togglePayment }: { data: SetupData; togglePayment: 
   )
 }
 
-// Step 4: Complete
+// Step 5: Complete
 function CompleteStep({ data }: { data: SetupData }) {
+  const activeTaxes = data.taxes.filter(t => t.isActive && t.name && t.rate > 0)
+  const totalTaxRate = activeTaxes.reduce((sum, t) => sum + t.rate, 0)
+
   const checklist = [
     { label: 'Brand colors configured', done: true },
+    { label: 'Currency & taxes configured', done: data.currency && (!data.taxEnabled || activeTaxes.length > 0) },
     { label: 'Tables set up', done: data.tableCount > 0 },
     { label: 'Payment methods selected', done: data.paymentMethods.length > 0 },
     { label: 'Menu items added', done: false, note: 'Add from dashboard' },
@@ -633,7 +901,7 @@ function CompleteStep({ data }: { data: SetupData }) {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-50 rounded-xl p-4">
           <div className="flex gap-2 mb-2">
             <div className="w-6 h-6 rounded-full" style={{ backgroundColor: data.primaryColor }} />
@@ -643,14 +911,35 @@ function CompleteStep({ data }: { data: SetupData }) {
           <p className="text-sm font-medium text-gray-700">Brand Colors</p>
         </div>
         <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-[var(--text)]">{data.tableCount}</p>
-          <p className="text-sm font-medium text-gray-700">Tables Configured</p>
+          <p className="text-2xl font-bold text-[var(--text)]">{data.currencySymbol}</p>
+          <p className="text-sm font-medium text-gray-700">{data.currency} Currency</p>
         </div>
         <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-2xl font-bold text-[var(--text)]">{data.paymentMethods.length}</p>
-          <p className="text-sm font-medium text-gray-700">Payment Methods</p>
+          <p className="text-2xl font-bold text-[var(--text)]">{data.taxEnabled ? `${totalTaxRate}%` : 'Off'}</p>
+          <p className="text-sm font-medium text-gray-700">Total Tax Rate</p>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-4">
+          <p className="text-2xl font-bold text-[var(--text)]">{data.tableCount}</p>
+          <p className="text-sm font-medium text-gray-700">Tables</p>
         </div>
       </div>
+
+      {/* Tax Details */}
+      {data.taxEnabled && activeTaxes.length > 0 && (
+        <div className="bg-blue-50 rounded-xl p-4">
+          <h4 className="font-medium text-blue-900 mb-2">Configured Taxes</h4>
+          <div className="flex flex-wrap gap-2">
+            {activeTaxes.map((tax) => (
+              <span key={tax.id} className="px-3 py-1 bg-white rounded-full text-sm text-blue-700">
+                {tax.name}: {tax.rate}%
+              </span>
+            ))}
+          </div>
+          {data.taxInclusive && (
+            <p className="text-xs text-blue-600 mt-2">• Prices are tax inclusive</p>
+          )}
+        </div>
+      )}
 
       {/* Checklist */}
       <div>

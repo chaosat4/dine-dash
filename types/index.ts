@@ -16,7 +16,26 @@ export interface Restaurant {
   isVerified: boolean
   subscriptionPlan: SubscriptionPlan
   subscriptionEnd?: string
+  
+  // Currency & Tax Settings
+  currency: string
+  currencySymbol: string
+  taxEnabled: boolean
+  taxInclusive: boolean
+  taxSettings?: TaxSetting[]
+  
   brandSettings?: BrandSettings
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TaxSetting {
+  id: string
+  restaurantId: string
+  name: string
+  rate: number
+  isActive: boolean
+  isDefault: boolean
   createdAt: string
   updatedAt: string
 }
@@ -178,6 +197,37 @@ export type OrderStatus =
   | 'CANCELLED'
 
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
+
+// ==================== INVOICE ====================
+
+export interface TaxBreakdownItem {
+  name: string
+  rate: number
+  amount: number
+}
+
+export interface Invoice {
+  id: string
+  restaurantId: string
+  invoiceNumber: string
+  orderId: string
+  order?: Order
+  customerName?: string
+  customerPhone?: string
+  customerEmail?: string
+  subtotal: number
+  taxBreakdown: TaxBreakdownItem[]
+  totalTax: number
+  discount: number
+  tip: number
+  grandTotal: number
+  paymentMethod?: string
+  paymentStatus: PaymentStatus
+  paidAt?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING: 'Order Placed',

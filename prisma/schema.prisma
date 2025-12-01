@@ -24,17 +24,40 @@ model Restaurant {
   isVerified      Boolean           @default(false)
   subscriptionPlan SubscriptionPlan @default(FREE)
   subscriptionEnd DateTime?
+  
+  // Currency & Tax Settings
+  currency        String            @default("INR")
+  currencySymbol  String            @default("₹")
+  taxEnabled      Boolean           @default(true)
+  taxInclusive    Boolean           @default(false)
+  
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   
   // Relations
   brandSettings   BrandSettings?
+  taxSettings     TaxSetting[]
   staff           Staff[]
   tables          Table[]
   categories      Category[]
   menuItems       MenuItem[]
   orders          Order[]
   customers       Customer[]
+  invoices        Invoice[]
+}
+
+model TaxSetting {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name          String     // e.g., "GST", "CGST", "SGST", "Service Tax"
+  rate          Float      // Percentage e.g., 5, 12, 18
+  isActive      Boolean    @default(true)
+  isDefault     Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([restaurantId])
 }
 
 model BrandSettings {
@@ -208,6 +231,7 @@ model Order {
   customerPhone   String?
   items           OrderItem[]
   subtotal        Float
+  taxBreakdown    Json?         // Array of { name, rate, amount }
   tax             Float         @default(0)
   total           Float
   tip             Float         @default(0)
@@ -218,6 +242,7 @@ model Order {
   paymentMethod   String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  invoice         Invoice?
 
   @@unique([restaurantId, orderNumber])
   @@index([restaurantId])
@@ -253,6 +278,43 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+// ==================== INVOICES ====================
+
+model Invoice {
+  id              String        @id @default(cuid())
+  restaurantId    String
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  invoiceNumber   String
+  orderId         String        @unique
+  order           Order         @relation(fields: [orderId], references: [id])
+  
+  // Customer details
+  customerName    String?
+  customerPhone   String?
+  customerEmail   String?
+  
+  // Amounts
+  subtotal        Float
+  taxBreakdown    Json          // Array of { name, rate, amount }
+  totalTax        Float
+  discount        Float         @default(0)
+  tip             Float         @default(0)
+  grandTotal      Float
+  
+  // Payment
+  paymentMethod   String?
+  paymentStatus   PaymentStatus @default(PENDING)
+  paidAt          DateTime?
+  
+  // Metadata
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([restaurantId, invoiceNumber])
+  @@index([restaurantId])
 }
 
 // ==================== OTP ====================

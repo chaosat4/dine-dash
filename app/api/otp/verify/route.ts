@@ -4,11 +4,11 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { phone, code } = body
+    const { phone, code, restaurantId } = body
 
-    if (!phone || !code) {
+    if (!phone || !code || !restaurantId) {
       return NextResponse.json(
-        { error: 'Phone and OTP code are required' },
+        { error: 'Phone, OTP code, and restaurantId are required' },
         { status: 400 }
       )
     }
@@ -37,32 +37,33 @@ export async function POST(request: NextRequest) {
       data: { verified: true },
     })
 
-    // Create or update user
-    let user = await prisma.user.findUnique({
-      where: { phone },
+    // Create or update customer
+    let customer = await prisma.customer.findUnique({
+      where: { restaurantId_phone: { restaurantId, phone } },
     })
 
-    if (!user) {
-      user = await prisma.user.create({
+    if (!customer) {
+      customer = await prisma.customer.create({
         data: {
+          restaurantId,
           phone,
           verified: true,
         },
       })
     } else {
-      user = await prisma.user.update({
-        where: { phone },
+      customer = await prisma.customer.update({
+        where: { restaurantId_phone: { restaurantId, phone } },
         data: { verified: true },
       })
     }
 
     return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        phone: user.phone,
-        name: user.name,
-        verified: user.verified,
+      customer: {
+        id: customer.id,
+        phone: customer.phone,
+        name: customer.name,
+        verified: customer.verified,
       },
     })
   } catch (error) {

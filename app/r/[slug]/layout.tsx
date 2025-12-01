@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { BrandProvider } from '@/components/BrandProvider'
 import type { Metadata } from 'next'
+import type { BrandSettings } from '@/types'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -39,7 +40,7 @@ export default async function RestaurantLayout({ children, params }: LayoutProps
   }
 
   return (
-    <BrandProvider brandSettings={restaurant.brandSettings}>
+    <BrandProvider brandSettings={restaurant.brandSettings as BrandSettings | null}>
       {children}
     </BrandProvider>
   )

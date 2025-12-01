@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find admin user
-    const user = await prisma.user.findUnique({
+    const user = await prisma.platformAdmin.findUnique({
       where: { email },
       select: {
         id: true,
@@ -23,11 +23,12 @@ export async function POST(request: NextRequest) {
         name: true,
         password: true,
         role: true,
+        isActive: true,
       },
     })
 
-    // Check if user exists, password matches, and has admin role
-    if (!user || user.password !== password || user.role !== 'ADMIN') {
+    // Check if user exists, password matches, and is active
+    if (!user || user.password !== password || !user.isActive) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }

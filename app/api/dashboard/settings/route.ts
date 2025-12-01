@@ -11,7 +11,10 @@ export async function GET() {
 
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: session.restaurantId },
-      include: { brandSettings: true },
+      include: { 
+        brandSettings: true,
+        taxSettings: true,
+      },
     })
 
     if (!restaurant) {
@@ -21,6 +24,7 @@ export async function GET() {
     return NextResponse.json({
       restaurant,
       brandSettings: restaurant.brandSettings,
+      taxSettings: restaurant.taxSettings,
     })
   } catch (error) {
     console.error('Settings fetch error:', error)
@@ -72,6 +76,40 @@ export async function PATCH(request: NextRequest) {
           tagline: data.tagline,
         },
       })
+    } else if (type === 'billing') {
+      // Update restaurant currency settings
+      await prisma.restaurant.update({
+        where: { id: session.restaurantId },
+        data: {
+          currency: data.currency,
+          currencySymbol: data.currencySymbol,
+          taxEnabled: data.taxEnabled,
+          taxInclusive: data.taxInclusive,
+        },
+      })
+
+      // Update tax settings
+      if (data.taxes && Array.isArray(data.taxes)) {
+        // Delete existing tax settings
+        await prisma.taxSetting.deleteMany({
+          where: { restaurantId: session.restaurantId },
+        })
+
+        // Create new tax settings
+        for (const tax of data.taxes) {
+          if (tax.name && tax.rate >= 0) {
+            await prisma.taxSetting.create({
+              data: {
+                restaurantId: session.restaurantId,
+                name: tax.name,
+                rate: tax.rate,
+                isActive: tax.isActive,
+                isDefault: false,
+              },
+            })
+          }
+        }
+      }
     }
 
     return NextResponse.json({ success: true })

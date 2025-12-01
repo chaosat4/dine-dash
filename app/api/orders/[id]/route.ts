@@ -22,7 +22,7 @@ export async function GET(
     })
 
     if (!order) {
-      order = await prisma.order.findUnique({
+      order = await prisma.order.findFirst({
         where: { orderNumber: id },
         include: {
           table: true,
@@ -67,36 +67,30 @@ export async function PATCH(
     if (paymentMethod) updateData.paymentMethod = paymentMethod
 
     // Try to update by ID first, then by orderNumber
-    let order
-    try {
-      order = await prisma.order.update({
-        where: { id },
-        data: updateData,
-        include: {
-          table: true,
-          items: {
-            include: {
-              menuItem: true,
-            },
-          },
-        },
-      })
-    } catch {
-      order = await prisma.order.update({
-        where: { orderNumber: id },
-        data: updateData,
-        include: {
-          table: true,
-          items: {
-            include: {
-              menuItem: true,
-            },
-          },
-        },
-      })
+    let order = await prisma.order.findUnique({ where: { id } })
+    
+    if (!order) {
+      order = await prisma.order.findFirst({ where: { orderNumber: id } })
+    }
+    
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    return NextResponse.json(order)
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: updateData,
+      include: {
+        table: true,
+        items: {
+          include: {
+            menuItem: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(updated)
   } catch (error) {
     console.error('Error updating order:', error)
     return NextResponse.json(

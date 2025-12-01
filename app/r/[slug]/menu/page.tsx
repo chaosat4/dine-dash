@@ -20,7 +20,7 @@ function MenuContent() {
   
   const { restaurant, setRestaurant, setTable, getCartCount } = useAppStore()
   const [categories, setCategories] = useState<Category[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [vegOnly, setVegOnly] = useState(false)
@@ -67,7 +67,7 @@ function MenuContent() {
   }, [slug, tableParam, restaurant, setRestaurant, setTable])
 
   const filteredItems = categories.flatMap((category) => {
-    if (selectedCategory !== 'all' && category.id !== selectedCategory) {
+    if (selectedCategory !== null && category.id !== selectedCategory) {
       return []
     }
     return (category.items || []).filter((item) => {
@@ -95,7 +95,7 @@ function MenuContent() {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <Header restaurantName={restaurant?.name} />
+      <Header title={restaurant?.name} />
       
       {/* Welcome Banner */}
       {brandSettings?.welcomeMessage && (
@@ -141,7 +141,7 @@ function MenuContent() {
 
         <CategoryFilter
           categories={categories}
-          selected={selectedCategory}
+          selectedCategory={selectedCategory}
           onSelect={setSelectedCategory}
         />
       </div>
@@ -158,7 +158,7 @@ function MenuContent() {
             >
               <MenuCard
                 item={item}
-                onClick={() => setSelectedItem(item)}
+                onSelect={() => setSelectedItem(item)}
               />
             </motion.div>
           ))}
@@ -193,12 +193,11 @@ function MenuContent() {
       )}
 
       {/* Item Detail Modal */}
-      {selectedItem && (
-        <ItemDetailModal
-          item={selectedItem}
-          onClose={() => setSelectedItem(null)}
-        />
-      )}
+      <ItemDetailModal
+        item={selectedItem}
+        open={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+      />
     </div>
   )
 }

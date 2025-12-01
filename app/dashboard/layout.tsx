@@ -19,6 +19,7 @@ import {
   QrCode,
   ChevronDown,
   X,
+  Receipt,
 } from 'lucide-react'
 import { useStaffStore } from '@/lib/store'
 import type { StaffRole } from '@/types'
@@ -38,6 +39,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/menu', label: 'Menu', icon: Utensils, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/tables', label: 'Tables', icon: TableIcon, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/qr-codes', label: 'QR Codes', icon: QrCode, roles: ['OWNER', 'MANAGER'] },
+  { href: '/dashboard/invoices', label: 'Invoices', icon: Receipt, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/staff', label: 'Staff', icon: Users, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['OWNER'] },
