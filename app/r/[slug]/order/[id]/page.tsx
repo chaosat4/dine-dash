@@ -9,11 +9,13 @@ import {
   ChefHat, 
   UtensilsCrossed, 
   ArrowLeft,
-  Phone,
-  RefreshCw
+  Bell,
+  RefreshCw,
+  Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/lib/store'
+import { useToast } from '@/components/ui/Toaster'
 import { formatPrice } from '@/lib/utils'
 import type { Order, OrderStatus } from '@/types'
 import { ORDER_STATUS_LABELS } from '@/types'
@@ -31,10 +33,13 @@ export default function OrderTrackingPage() {
   const slug = params.slug as string
   const orderId = params.id as string
   
-  const { restaurant } = useAppStore()
+  const { restaurant, tableId } = useAppStore()
+  const { addToast } = useToast()
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false)
+  const [waiterCalled, setWaiterCalled] = useState(false)
 
   const brandSettings = restaurant?.brandSettings
 
@@ -63,6 +68,45 @@ export default function OrderTrackingPage() {
   const handleRefresh = () => {
     setIsRefreshing(true)
     fetchOrder()
+  }
+
+  const handleCallWaiter = async () => {
+    if (!restaurant?.id || !tableId) {
+      addToast({ title: 'Unable to call waiter', type: 'error' })
+      return
+    }
+
+    setIsCallingWaiter(true)
+    try {
+      const res = await fetch('/api/waiter-calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: restaurant.id,
+          tableId: tableId,
+          reason: 'Assistance requested',
+        }),
+      })
+
+      if (res.ok) {
+        setWaiterCalled(true)
+        addToast({ title: 'Waiter has been called!', type: 'success' })
+        // Reset after 30 seconds to allow calling again
+        setTimeout(() => setWaiterCalled(false), 30000)
+      } else {
+        const data = await res.json()
+        if (data.existing) {
+          setWaiterCalled(true)
+          addToast({ title: 'Waiter already called for your table', type: 'info' })
+        } else {
+          addToast({ title: 'Failed to call waiter', type: 'error' })
+        }
+      }
+    } catch {
+      addToast({ title: 'Failed to call waiter', type: 'error' })
+    } finally {
+      setIsCallingWaiter(false)
+    }
   }
 
   const getCurrentStepIndex = () => {
@@ -254,17 +298,36 @@ export default function OrderTrackingPage() {
           </div>
         </motion.div>
 
-        {/* Need Help */}
+        {/* Call Waiter */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="bg-white rounded-2xl p-6 shadow-sm text-center"
         >
-          <p className="text-gray-500 mb-4">Need help with your order?</p>
-          <Button variant="outline" className="gap-2">
-            <Phone className="w-4 h-4" />
-            Call Restaurant
+          <p className="text-gray-500 mb-4">Need assistance?</p>
+          <Button 
+            onClick={handleCallWaiter}
+            disabled={isCallingWaiter || waiterCalled}
+            className="gap-2"
+            style={{ backgroundColor: waiterCalled ? '#22c55e' : brandSettings?.primaryColor }}
+          >
+            {isCallingWaiter ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Calling...
+              </>
+            ) : waiterCalled ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                Waiter Called
+              </>
+            ) : (
+              <>
+                <Bell className="w-4 h-4" />
+                Call Waiter
+              </>
+            )}
           </Button>
         </motion.div>
 

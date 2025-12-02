@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendVerificationOTP } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,8 +84,13 @@ export async function POST(request: NextRequest) {
       return { restaurant, staff, code }
     })
 
-    // In production, send email with verification code
-    console.log(`Verification code for ${email}: ${result.code}`)
+    // Send email with verification code
+    try {
+      await sendVerificationOTP(email, result.code, ownerName)
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError)
+      // Continue even if email fails - OTP is stored in DB
+    }
 
     return NextResponse.json({
       success: true,

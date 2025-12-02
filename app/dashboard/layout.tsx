@@ -16,10 +16,10 @@ import {
   BarChart3,
   Utensils,
   TableIcon,
-  QrCode,
   ChevronDown,
   X,
   Receipt,
+  Bell,
 } from 'lucide-react'
 import { useStaffStore } from '@/lib/store'
 import type { StaffRole } from '@/types'
@@ -35,10 +35,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/orders', label: 'Orders', icon: ConciergeBell, roles: ['OWNER', 'MANAGER', 'WAITER'] },
+  { href: '/dashboard/calls', label: 'Calls', icon: Bell, roles: ['OWNER', 'MANAGER', 'WAITER'] },
   { href: '/dashboard/kitchen', label: 'Kitchen', icon: ChefHat, roles: ['OWNER', 'MANAGER', 'CHEF'] },
   { href: '/dashboard/menu', label: 'Menu', icon: Utensils, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/tables', label: 'Tables', icon: TableIcon, roles: ['OWNER', 'MANAGER'] },
-  { href: '/dashboard/qr-codes', label: 'QR Codes', icon: QrCode, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/invoices', label: 'Invoices', icon: Receipt, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/staff', label: 'Staff', icon: Users, roles: ['OWNER', 'MANAGER'] },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, roles: ['OWNER', 'MANAGER'] },
@@ -51,6 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { staffId, staffName, role, restaurantId, clearStaff } = useStaffStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [pendingCallsCount, setPendingCallsCount] = useState(0)
 
   useEffect(() => {
     // Check authentication
@@ -80,6 +81,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     checkAuth()
   }, [router])
 
+  // Fetch pending calls count for badge
+  useEffect(() => {
+    if (!restaurantId || pathname === '/dashboard/login') return
+
+    const fetchPendingCalls = async () => {
+      try {
+        const res = await fetch('/api/waiter-calls?status=PENDING')
+        if (res.ok) {
+          const calls = await res.json()
+          setPendingCallsCount(calls.length)
+        }
+      } catch (error) {
+        console.error('Error fetching pending calls:', error)
+      }
+    }
+
+    fetchPendingCalls()
+    // Auto-refresh every 5 seconds for real-time updates
+    const interval = setInterval(fetchPendingCalls, 5000)
+    return () => clearInterval(interval)
+  }, [restaurantId, pathname])
+
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/staff/logout', { method: 'POST' })
@@ -90,9 +113,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
-  const filteredNavItems = navItems.filter(
-    (item) => role && item.roles.includes(role)
-  )
+  const filteredNavItems = navItems
+    .filter((item) => role && item.roles.includes(role))
+    .map((item) => {
+      // Add badge to Calls item if there are pending calls
+      if (item.href === '/dashboard/calls' && pendingCallsCount > 0) {
+        return { ...item, badge: pendingCallsCount }
+      }
+      return item
+    })
 
   if (isLoading) {
     return (
@@ -221,6 +250,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   >
                     <Icon className="w-5 h-5" />
                     <span className="font-medium">{item.label}</span>
+                    {item.badge && (
+                      <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 )
               })}

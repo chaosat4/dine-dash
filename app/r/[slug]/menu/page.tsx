@@ -3,13 +3,17 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { ShoppingCart, Leaf, Search, X } from 'lucide-react'
+import { ShoppingCart, Leaf, Search, X, Bell, Phone } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { formatPrice } from '@/lib/utils'
 import { CategoryFilter } from '@/components/menu/CategoryFilter'
 import { MenuCard } from '@/components/menu/MenuCard'
 import { ItemDetailModal } from '@/components/menu/ItemDetailModal'
 import { Header } from '@/components/layout/Header'
+import { Modal } from '@/components/ui/Modal'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toaster'
 import type { Category, MenuItem, Restaurant } from '@/types'
 
 function MenuContent() {
@@ -18,13 +22,18 @@ function MenuContent() {
   const slug = params.slug as string
   const tableParam = searchParams.get('table')
   
-  const { restaurant, setRestaurant, setTable, getCartCount } = useAppStore()
+  const { restaurant, setRestaurant, setTable, getCartCount, tableId, user, setUser } = useAppStore()
+  const { addToast } = useToast()
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [vegOnly, setVegOnly] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false)
+  const [waiterCalled, setWaiterCalled] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -81,6 +90,106 @@ function MenuContent() {
 
   const cartCount = getCartCount()
   const brandSettings = restaurant?.brandSettings
+  
+  // Check if user can call waiter (has phone number or is verified)
+  const canCallWaiter = (user?.phone && user.phone.length >= 10) || user?.verified === true
+  
+  const handleCallWaiter = async () => {
+    if (!restaurant?.id || !tableId) {
+      addToast({ title: 'Please scan a table QR code first', type: 'error' })
+      return
+    }
+
+    // If user doesn't have phone number, show modal to collect it
+    if (!canCallWaiter) {
+      setShowPhoneModal(true)
+      return
+    }
+
+    setIsCallingWaiter(true)
+    try {
+      const res = await fetch('/api/waiter-calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: restaurant.id,
+          tableId: tableId,
+          reason: 'Assistance requested',
+        }),
+      })
+
+      if (res.ok) {
+        setWaiterCalled(true)
+        addToast({ title: 'Waiter has been called!', type: 'success' })
+        // Reset after 30 seconds to allow calling again
+        setTimeout(() => setWaiterCalled(false), 30000)
+      } else {
+        const data = await res.json()
+        if (data.existing) {
+          setWaiterCalled(true)
+          addToast({ title: 'Waiter already called for your table', type: 'info' })
+        } else {
+          addToast({ title: 'Failed to call waiter', type: 'error' })
+        }
+      }
+    } catch {
+      addToast({ title: 'Failed to call waiter', type: 'error' })
+    } finally {
+      setIsCallingWaiter(false)
+    }
+  }
+
+  const handleSavePhoneAndCall = async () => {
+    if (!phoneNumber || phoneNumber.length < 10) {
+      addToast({ title: 'Please enter a valid phone number', type: 'error' })
+      return
+    }
+
+    if (!restaurant?.id || !tableId) {
+      addToast({ title: 'Please scan a table QR code first', type: 'error' })
+      return
+    }
+
+    // Save phone number to store
+    setUser({
+      phone: phoneNumber,
+      verified: false,
+    })
+    
+    setShowPhoneModal(false)
+    setIsCallingWaiter(true)
+    
+    try {
+      const res = await fetch('/api/waiter-calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: restaurant.id,
+          tableId: tableId,
+          reason: 'Assistance requested',
+        }),
+      })
+
+      if (res.ok) {
+        setWaiterCalled(true)
+        addToast({ title: 'Waiter has been called!', type: 'success' })
+        setTimeout(() => setWaiterCalled(false), 30000)
+      } else {
+        const data = await res.json()
+        if (data.existing) {
+          setWaiterCalled(true)
+          addToast({ title: 'Waiter already called for your table', type: 'info' })
+        } else {
+          addToast({ title: 'Failed to call waiter', type: 'error' })
+        }
+      }
+    } catch {
+      addToast({ title: 'Failed to call waiter', type: 'error' })
+    } finally {
+      setIsCallingWaiter(false)
+      setPhoneNumber('')
+    }
+  }
 
   if (isLoading) {
     return (
@@ -171,6 +280,27 @@ function MenuContent() {
         )}
       </div>
 
+      {/* Call Waiter Button - Fixed Bottom Right */}
+      {tableId && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          onClick={handleCallWaiter}
+          disabled={isCallingWaiter || waiterCalled}
+          className={`fixed right-4 z-30 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed ${
+            cartCount > 0 ? 'bottom-24' : 'bottom-4'
+          }`}
+          style={{ backgroundColor: waiterCalled ? '#10b981' : (brandSettings?.primaryColor || 'var(--primary)') }}
+          title={waiterCalled ? 'Waiter called!' : 'Call Waiter'}
+        >
+          {waiterCalled ? (
+            <X className="w-6 h-6" />
+          ) : (
+            <Bell className="w-6 h-6" />
+          )}
+        </motion.button>
+      )}
+
       {/* Cart Button */}
       {cartCount > 0 && (
         <motion.div
@@ -198,6 +328,45 @@ function MenuContent() {
         open={!!selectedItem}
         onClose={() => setSelectedItem(null)}
       />
+
+      {/* Phone Number Modal */}
+      <Modal
+        open={showPhoneModal}
+        onClose={() => setShowPhoneModal(false)}
+        title="Enter Phone Number"
+      >
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-600">
+            Please provide your phone number to call a waiter.
+          </p>
+          <Input
+            label="Phone Number *"
+            placeholder="10-digit mobile number"
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            icon={<Phone className="w-5 h-5" />}
+            required
+          />
+          <div className="flex gap-3 pt-4">
+            <Button
+              onClick={handleSavePhoneAndCall}
+              className="flex-1"
+              disabled={!phoneNumber || phoneNumber.length < 10}
+              style={{ backgroundColor: brandSettings?.primaryColor || 'var(--primary)' }}
+            >
+              Save & Call Waiter
+            </Button>
+            <Button
+              onClick={() => setShowPhoneModal(false)}
+              variant="outline"
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

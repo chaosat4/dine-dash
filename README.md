@@ -198,7 +198,7 @@ A multi-tenant restaurant ordering platform built with Next.js, Prisma, and Type
 | `/dashboard/menu` | Menu management |
 | `/dashboard/orders` | Order management |
 | `/dashboard/kitchen` | Kitchen display |
-| `/dashboard/qr-codes` | QR code generator |
+| `/dashboard/tables` | Tables & QR code management |
 | `/dashboard/staff` | Staff management |
 | `/dashboard/settings` | Restaurant settings |
 | `/dashboard/invoices` | Invoice management |

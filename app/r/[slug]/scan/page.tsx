@@ -3,30 +3,82 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Camera, QrCode, ArrowRight, AlertCircle } from 'lucide-react'
+import { Camera, QrCode, ArrowRight, AlertCircle, ChevronDown } from 'lucide-react'
 import jsQR from 'jsqr'
 import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/lib/store'
 import { useToast } from '@/components/ui/Toaster'
+
+interface Table {
+  id: string
+  number: number
+  status: string
+}
 
 export default function ScanPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
   const { addToast } = useToast()
-  const { restaurant, setTable } = useAppStore()
+  const { restaurant, setRestaurant, setTable } = useAppStore()
   
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isScanning, setIsScanning] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tables, setTables] = useState<Table[]>([])
+  const [selectedTableId, setSelectedTableId] = useState<string>('')
 
   useEffect(() => {
     return () => {
       stopCamera()
     }
   }, [])
+
+  // Fetch restaurant if not in store
+  useEffect(() => {
+    const fetchRestaurant = async () => {
+      if (restaurant && restaurant.slug === slug) return
+      try {
+        const res = await fetch(`/api/restaurants/${slug}`)
+        if (res.ok) {
+          const data = await res.json()
+          setRestaurant(data)
+        }
+      } catch (err) {
+        console.error('Error fetching restaurant:', err)
+      }
+    }
+    fetchRestaurant()
+  }, [slug, restaurant, setRestaurant])
+
+  // Fetch tables once restaurant is loaded
+  useEffect(() => {
+    const fetchTables = async () => {
+      if (!restaurant?.id) return
+      try {
+        const res = await fetch(`/api/tables?restaurantId=${restaurant.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          setTables(data)
+        }
+      } catch (err) {
+        console.error('Error fetching tables:', err)
+      }
+    }
+    fetchTables()
+  }, [restaurant?.id])
+
+  const handleTableSelect = (tableId: string) => {
+    setSelectedTableId(tableId)
+    const table = tables.find(t => t.id === tableId)
+    if (table) {
+      setTable(table.id, table.number)
+      addToast({ title: `Table ${table.number} selected`, type: 'success' })
+      router.push(`/r/${slug}/menu`)
+    }
+  }
 
   const startCamera = async () => {
     try {
@@ -180,9 +232,29 @@ export default function ScanPage() {
                 Start Scanning
               </Button>
 
+              <div className="relative w-full mt-4">
+                <p className="text-sm text-gray-500 mb-2">Or select your table:</p>
+                <div className="relative">
+                  <select
+                    value={selectedTableId}
+                    onChange={(e) => handleTableSelect(e.target.value)}
+                    className="w-full appearance-none px-4 py-3 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 pr-10"
+                    style={{ borderColor: brandSettings?.primaryColor }}
+                  >
+                    <option value="">Choose a table...</option>
+                    {tables.map((table) => (
+                      <option key={table.id} value={table.id}>
+                        Table {table.number}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
               <button
                 onClick={() => router.push(`/r/${slug}/menu`)}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-gray-500 hover:text-gray-700 mt-4"
               >
                 Skip and browse menu
               </button>

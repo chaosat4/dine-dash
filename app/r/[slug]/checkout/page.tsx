@@ -29,13 +29,15 @@ export default function CheckoutPage() {
     tableNumber, 
     getCartTotal, 
     clearCart, 
-    setCurrentOrderId 
+    setCurrentOrderId,
+    user,
+    setUser
   } = useAppStore()
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
+    name: user?.name || '',
+    phone: user?.phone || '',
     specialRequests: '',
     paymentMethod: 'cash',
   })
@@ -59,6 +61,15 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true)
     try {
+      // Save user info to store
+      if (formData.phone) {
+        setUser({
+          phone: formData.phone,
+          name: formData.name || undefined,
+          verified: false,
+        })
+      }
+
       const orderData = {
         restaurantId: restaurant?.id,
         tableId,
