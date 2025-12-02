@@ -1,25 +1,44 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { UtensilsCrossed, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { UtensilsCrossed, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toaster'
-import { useStaffStore } from '@/lib/store'
 
-export default function DashboardLoginPage() {
+export default function ResetPasswordPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { addToast } = useToast()
-  const setStaff = useStaffStore((s) => s.setStaff)
   const [isLoading, setIsLoading] = useState(false)
+  const [passwordReset, setPasswordReset] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
+    token: '',
     password: '',
+    confirmPassword: '',
   })
+
+  useEffect(() => {
+    const token = searchParams.get('token')
+    const email = searchParams.get('email')
+    
+    if (token && email) {
+      setFormData(prev => ({
+        ...prev,
+        token: decodeURIComponent(token),
+        email: decodeURIComponent(email),
+      }))
+    } else {
+      addToast({ title: 'Invalid reset link', type: 'error' })
+      router.push('/dashboard/forgot-password')
+    }
+  }, [searchParams, router, addToast])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -27,45 +46,74 @@ export default function DashboardLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (formData.password !== formData.confirmPassword) {
+      addToast({ title: 'Passwords do not match', type: 'error' })
+      return
+    }
+
+    if (formData.password.length < 8) {
+      addToast({ title: 'Password must be at least 8 characters', type: 'error' })
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/auth/staff/login', {
+      const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          email: formData.email,
+          token: formData.token,
+          newPassword: formData.password,
+        }),
       })
 
       const data = await res.json()
 
       if (res.ok) {
-        setStaff({
-          staffId: data.staffId,
-          restaurantId: data.restaurantId,
-          staffName: data.name,
-          role: data.role,
-        })
-        addToast({ title: 'Login successful!', type: 'success' })
-        
-        // Redirect based on role
-        switch (data.role) {
-          case 'CHEF':
-            router.push('/dashboard/kitchen')
-            break
-          case 'WAITER':
-            router.push('/dashboard/orders')
-            break
-          default:
-            router.push('/dashboard')
-        }
+        setPasswordReset(true)
+        addToast({ title: 'Password reset successfully!', type: 'success' })
+        setTimeout(() => {
+          router.push('/dashboard/login')
+        }, 2000)
       } else {
-        addToast({ title: data.error || 'Login failed', type: 'error' })
+        addToast({ title: data.error || 'Failed to reset password', type: 'error' })
       }
     } catch (error) {
       addToast({ title: 'Something went wrong', type: 'error' })
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (passwordReset) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[#fdf8f5]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md"
+        >
+          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Password Reset Successful!</h2>
+            <p className="text-gray-600 mb-6">
+              Your password has been reset successfully. You can now sign in with your new password.
+            </p>
+            <Button
+              onClick={() => router.push('/dashboard/login')}
+              className="w-full"
+            >
+              Go to Login
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
@@ -77,6 +125,10 @@ export default function DashboardLoginPage() {
         </div>
         
         <div className="relative z-10">
+          <Link href="/dashboard/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-4">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Login
+          </Link>
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
               <UtensilsCrossed className="w-6 h-6 text-white" />
@@ -85,31 +137,15 @@ export default function DashboardLoginPage() {
               Dine & Dash
             </span>
           </div>
-          <p className="text-white/60">Staff Dashboard</p>
         </div>
 
         <div className="relative z-10">
           <h1 className="text-4xl font-bold text-white mb-6" style={{ fontFamily: 'var(--font-playfair)' }}>
-            Manage Your Restaurant Efficiently
+            Set New Password
           </h1>
           <p className="text-white/70 text-lg">
-            Access orders, kitchen queue, table management, and analytics all in one place.
+            Choose a strong password to secure your account.
           </p>
-        </div>
-
-        <div className="relative z-10 flex gap-8">
-          <div>
-            <p className="text-3xl font-bold text-white">500+</p>
-            <p className="text-white/50 text-sm">Restaurants</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-white">1M+</p>
-            <p className="text-white/50 text-sm">Orders Served</p>
-          </div>
-          <div>
-            <p className="text-3xl font-bold text-white">99.9%</p>
-            <p className="text-white/50 text-sm">Uptime</p>
-          </div>
         </div>
       </div>
 
@@ -117,10 +153,10 @@ export default function DashboardLoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-[#fdf8f5]">
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-              <UtensilsCrossed className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-[var(--text)]">Dine & Dash</span>
+            <Link href="/dashboard/login" className="inline-flex items-center gap-2 text-gray-600 hover:text-[var(--primary)]">
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Link>
           </div>
 
           <motion.div
@@ -129,27 +165,16 @@ export default function DashboardLoginPage() {
             transition={{ duration: 0.5 }}
           >
             <h2 className="text-2xl lg:text-3xl font-bold text-[var(--text)] mb-2" style={{ fontFamily: 'var(--font-playfair)' }}>
-              Staff Login
+              Reset Password
             </h2>
             <p className="text-gray-500 mb-8">
-              Sign in to access your dashboard
+              Enter your new password below.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Email Address"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="your@email.com"
-                icon={<Mail className="w-5 h-5" />}
-                required
-              />
-
               <div className="relative">
                 <Input
-                  label="Password"
+                  label="New Password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
@@ -167,35 +192,46 @@ export default function DashboardLoginPage() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="rounded border-gray-300" />
-                  <span className="text-gray-600">Remember me</span>
-                </label>
-                <Link href="/dashboard/forgot-password" className="text-[var(--primary)] hover:underline">
-                  Forgot password?
-                </Link>
+              <div className="relative">
+                <Input
+                  label="Confirm Password"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  icon={<Lock className="w-5 h-5" />}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
+
+              <p className="text-xs text-gray-500">
+                Password must be at least 8 characters long.
+              </p>
 
               <Button type="submit" className="w-full mt-6" disabled={isLoading}>
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Signing in...
+                    Resetting...
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    Sign In
-                    <ArrowRight className="w-5 h-5" />
-                  </div>
+                  'Reset Password'
                 )}
               </Button>
 
               <p className="text-center text-sm text-gray-500 mt-6">
-                New restaurant?{' '}
-                <a href="/onboarding" className="text-[var(--primary)] font-medium hover:underline">
-                  Register here
-                </a>
+                Remember your password?{' '}
+                <Link href="/dashboard/login" className="text-[var(--primary)] font-medium hover:underline">
+                  Sign in
+                </Link>
               </p>
             </form>
           </motion.div>
